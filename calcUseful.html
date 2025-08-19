@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CalcUseful</title>
+</head>
+<style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+    }
+    body {
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+    }
+    .principal {
+        min-width: 240px;
+        max-width: 300px;
+        font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        display:flex;
+        flex-direction: column;
+        height: 100%;
+        border: 1px solid #f0f0f0;
+        width: 100%;
+    }
+    .contEntrada {
+        border-width: 1px;
+        border-top: 0;
+        border-right: 0;
+        border-bottom: 1px solid;
+        border-left: 0;
+    }
+    #entrada {
+        display: inline-block;
+        min-height: 1.5em;
+        text-align: right;
+        width: 100%;
+        font-size: 30px;
+        caret-color: red;
+        word-break: break-all;
+    }
+    #entrada:focus {
+        outline-style: none;
+    }
+    #entrada i {
+        font-style: normal;
+        color: red;
+    }
+    .contHistoria {
+        height: 100%;
+    }
+    #salida {
+        text-align: right;
+        min-height: 1.5em;
+    }
+    #botones {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+    }
+    #botones button {
+        aspect-ratio: 1;
+        font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 2em;
+        color: dimgray;
+        cursor: pointer;
+        border: 1px solid white;
+        background-color: lightgray;
+        /* color: white; */
+        /* background-color: #101010; */
+    }
+    #botones button.op {
+        color: dimgray;
+        background-color:lightblue;
+        font-size:1.5em;
+        /* color: #2f89ff; */
+        /* background-color: #2d2d2d; */
+    }
+    #botones button:hover {
+        filter:brightness(80%);
+        /* filter:brightness(200%); */
+    }
+</style>
+<body>
+    <div class="principal">
+        <div class="contEntrada">
+            <span id="entrada" contenteditable="true" inputmode="none">45<i>*</i><i>(</i>3<i>+</i>2<i>)</i><i>-</i>27<i>/</i><i>(</i>5<i>*</i><i>(</i>2<i>-</i>4<i>)</i><i>)</i></span>
+        </div>
+        <div class="contHistoria">
+            <div id="salida"></div>
+        </div>
+        <section id="botones">
+            <button id ="limpiar" class="op">AC</button>
+            <button id ="borrar" class="op">&#9003;</button>
+            <button id ="parentesis" class="op">( )</button>
+            <button id ="dividir" class="op">÷</button>
+            <button id ="siete">7</button>
+            <button id ="ocho">8</button>
+            <button id ="nueve">9</button>
+            <button id ="multiplicar" class="op">&#8727;</button>
+            <button id ="cuatro">4</button>
+            <button id ="cinco">5</button>
+            <button id ="seis">6</button>
+            <button id ="restar" class="op">-</button>
+            <button id ="uno">1</button>
+            <button id ="dos">2</button>
+            <button id ="tres">3</button>
+            <button id ="sumar" class="op">+</button>
+            <button id ="cero">0</button>
+            <button id ="decimal">.</button>
+            <button id ="ANS" class="op">ANS</button>
+            <button id ="igual" class="op">=</button>
+        </section>
+    </div>
+</body>
+<script>
+    'use strict';
+    const num = {decimal: '.', cero: '0', uno: '1', dos: '2', tres: '3', cuatro: '4', cinco: '5', seis: '6', siete: '7', ocho: '8', nueve: '9'};
+    const ope = {sumar: '+', restar: '-', multiplicar: '*', dividir: '/', porcentaje: '%', parentesisabrir: '(', parentesiscerrar: ')'};
+    const botonesId = {...num, ...ope};
+    const expTodos = /[-+*/()]/g;
+    const expParentesis = /\(([^()]+)\)/g;
+    const expPri1 = /(\[\d+\]|[-+]?\d+(\.\d+)?)([*/])(\[\d+\]|[-+]?\d+(\.\d+)?)/;
+    const expPri2 = /(\[\d+\]|[-+]?\d+(\.\d+)?)([-+])(\[\d+\]|[-+]?\d+(\.\d+)?)/;
+    const expVar = /\[(\d+)\]/;
+
+    let entrada = document.getElementById('entrada');
+    let salida = document.getElementById('salida');
+    let botones = document.getElementById('botones');
+    let startPos = 0;
+
+    function getCaretIndex(element) {
+        let position = 0;
+        if (element.innerHTML.length > 0) {
+            const selection = window.getSelection();
+            if (selection.rangeCount !== 0) {
+                const range = selection.getRangeAt(0);
+                const preCaretRange = range.cloneRange();
+                preCaretRange.setStart(element.childNodes[0], 0);
+                position = preCaretRange.toString().length;
+            }
+        }
+        return position;
+    }
+
+    function setCaretIndex(el, pos) {
+        for (let poshijo = 0; poshijo < el.childNodes.length; poshijo ++) {
+            let hijo = el.childNodes[poshijo];
+            if (hijo.textContent && pos <= hijo.textContent.length) {
+                const range = document.createRange();
+                const seleccion = window.getSelection();
+                range.setStart(hijo, pos);
+                seleccion.removeAllRanges();
+                seleccion.addRange(range);
+                break;
+            }
+            pos -= hijo.textContent.length;
+        }       
+    }
+
+    function displayTextWidth(text, font) {
+        let canvas = displayTextWidth.canvas || (displayTextWidth.canvas = document.createElement("canvas"));
+        let context = canvas.getContext("2d");
+        context.font = font;
+        let metrics = context.measureText(text);
+        // console.log(`Text: ${text} = ${metrics.width}`)
+        return metrics.width;
+    }
+
+    
+    function renderTxt(formula, simbolo, pos) {
+        let salida = '';
+        if (simbolo) {
+            formula = [formula.substring(0, startPos), simbolo, formula.substring(startPos)].join('');
+        }
+        Array.from(formula).forEach(a => {
+            if (Object.values(num).includes(a)) {
+                salida += a;
+            }
+            if (Object.values(ope).includes(a)) {
+                salida += '<i>' + a  + '</i>';
+            }
+        });
+        let tamsize = Math.floor((entrada.clientWidth - 10) * 32 / displayTextWidth(formula, "32px 'Segoe UI'")/5)*5;
+        if (tamsize > 30) {
+            tamsize = 30;
+        }
+        if (tamsize < 10) {
+            tamsize = 10;
+        }
+        entrada.style.fontSize = tamsize + "px";
+        entrada.innerHTML = salida;
+        if (salida) {
+            setCaretIndex(entrada, pos);
+        } else {
+            entrada.focus();
+        }
+    }
+
+    let solucion = {
+        indice: -1,
+        error: '',
+        pasos: []
+    }
+
+    let ultResultado = '0'
+
+    function evaluar(txtformula) {
+        let cantParAbrir = 0;
+        let cantParCerrar = 0;
+        solucion.indice = -1;
+        solucion.error = '';
+        solucion.pasos = [];
+        if (txtformula.search(/\(/g) != -1) {
+            cantParAbrir = txtformula.match(/\(/g).length;
+        }
+        if (txtformula.search(/\)/g) != -1) {
+            cantParCerrar = txtformula.match(/\)/g).length;
+        }
+        if (cantParCerrar > cantParAbrir) {
+            solucion.error = 'Error en Paréntesis';
+        } else {
+            if (cantParAbrir !== cantParCerrar) {
+                txtformula += ')'.repeat(cantParAbrir - cantParCerrar);
+            }
+        }
+        if (solucion.error === '') {
+            crearExpresiones(txtformula);
+            resolver();
+            if (solucion.error ==='') {
+                ultResultado = solucion.pasos[solucion.pasos.length-1].valor + '';
+            }
+        }
+    }
+
+    function crearExpresiones(formula) {
+        while (formula.search(expParentesis) != -1) { //Después cambiar expParentesis por expTodos
+            let ultPos = 0;
+            let resultado = '';
+            for (let expresion of formula.matchAll(expParentesis)) {
+                resultado += formula.substring(ultPos, expresion.index);
+                crearExpresiones(expresion[1]);
+                resultado += `[${solucion.indice}]`;
+                ultPos = expresion.index + expresion[0].length;
+            }
+            resultado += formula.substring(ultPos);
+            formula = resultado;
+        }
+        let minimo = formula.match(expPri1);
+        while (minimo) {
+            solucion.indice += 1;
+            if (minimo.index > 0 && '-+'.includes(minimo[1][0])) { // Saber si el signo correponde al número o a una operación
+                if (']0123456789'.includes(formula[minimo.index - 1])) {
+                    minimo.index += 1;
+                    minimo[0] = minimo[0].substring(1);
+                    minimo[1] = minimo[1].substring(1);
+                }
+            }
+            solucion.pasos.push({p1: minimo[1], ope: minimo[3], p2: minimo[4], valor: 0});
+            formula = formula.substring(0, minimo.index) + 
+                `[${solucion.indice}]` + formula.substring(minimo.index + minimo[0].length);
+            minimo = formula.match(expPri1);
+        }
+        minimo = formula.match(expPri2);
+        while (minimo) {
+            solucion.indice += 1;
+            solucion.pasos.push({p1: minimo[1], ope: minimo[3], p2: minimo[4], valor: 0});
+            formula = formula.substring(0, minimo.index) + 
+                `[${solucion.indice}]` + formula.substring(minimo.index + minimo[0].length);
+            minimo = formula.match(expPri2);
+        }
+    }
+
+    function resolver() {
+        let n1;
+        let n2;
+        for (let i = 0; i < solucion.pasos.length; i++) {
+            if (solucion.pasos[i].p1.search(expVar) != -1) {
+                n1 = solucion.pasos[solucion.pasos[i].p1.replace(/[\[\]]/g,'')].valor;
+            } else {
+                n1 = parseFloat(solucion.pasos[i].p1);
+            }
+            if (solucion.pasos[i].p2.search(expVar) != -1) {
+                n2 = solucion.pasos[solucion.pasos[i].p2.replace(/[\[\]]/g,'')].valor;
+            } else {
+                n2 = parseFloat(solucion.pasos[i].p2);
+            }
+            switch (solucion.pasos[i].ope) {
+                case '*':
+                    solucion.pasos[i].valor = n1 * n2;
+                    break;
+                case '/':
+                    solucion.pasos[i].valor = n1 / n2;
+                    break;
+                case '+':
+                    solucion.pasos[i].valor = n1 + n2;
+                    break;
+                case '-':
+                    solucion.pasos[i].valor = n1 - n2;
+                    break;
+            }
+        }
+    }
+
+    botones.addEventListener('click', function(event) {
+        let boton = event.target.id;
+        startPos = getCaretIndex(entrada);
+        let txtEntrada = entrada.textContent;
+        switch (boton) {
+            case 'limpiar':
+                salida.innerHTML = '';
+                renderTxt('', '', 0);
+                break;
+            case 'borrar':
+                txtEntrada = [txtEntrada.substring(0, startPos - 1), txtEntrada.substring(startPos)].join('');
+                renderTxt(txtEntrada, '', startPos - 1);
+                break;
+            case 'igual':
+                evaluar(txtEntrada);
+                if (solucion.error === '') {
+                    let resultado = solucion.pasos[solucion.pasos.length - 1].valor + '';
+                    salida.innerHTML = txtEntrada;
+                    renderTxt(resultado, '', resultado.length);
+                } else {
+                    salida.innerHTML = solucion.error;
+                    entrada.focus();
+                }
+                break;
+            case 'ANS':
+                renderTxt(txtEntrada, ultResultado, startPos + ultResultado.length)
+                break;
+            case 'parentesis':
+                let simbolo;
+                if (startPos === 0 || Object.values(ope).includes(txtEntrada.substring(startPos - 1, startPos))) {
+                    simbolo = ope['parentesisabrir'];
+                } else {
+                    simbolo = ope['parentesiscerrar'];
+                }
+                renderTxt(txtEntrada, simbolo, startPos + 1);
+                break;
+            default:
+                renderTxt(txtEntrada, botonesId[boton], startPos + 1);
+        }
+    });
+</script>
+</html>
